@@ -1,0 +1,478 @@
+# TP1 - Ligue-4 com Busca Adversarial
+
+Este arquivo descreve, de forma detalhada, como o agente de IA do projeto será construído e como cada função deve funcionar. A ideia é implementar o agente em etapas pequenas, validando cada parte antes de avançar para a seguinte.
+
+O objetivo final é ter um agente capaz de jogar Ligue-4 usando:
+
+1. Validação do ambiente e jogadas aleatórias.
+2. Função de avaliação heurística.
+3. Minimax com profundidade limitada.
+4. Poda Alfa-Beta.
+5. Iterative Deepening com limite de tempo.
+
+## 1. Visão geral do funcionamento
+
+O servidor Flask chama a função `choose_move(board, turn, config)` em `search.py`. Essa função recebe o estado atual do tabuleiro, o jogador da vez e os parâmetros de controle definidos na interface web.
+
+### Entrada da função principal
+
+- `board`: matriz `6 x 7` com valores:
+  - `0` = casa vazia
+  - `1` = peça do Jogador 1
+  - `2` = peça do Jogador 2
+- `turn`: jogador que deve jogar agora, `1` ou `2`
+- `config`: dicionário com parâmetros da jogada:
+  - `max_time_ms`: tempo máximo por jogada em milissegundos
+  - `max_depth`: profundidade máxima permitida na busca
+
+### Saída esperada
+
+`choose_move` deve retornar:
+
+- a coluna escolhida, entre `0` e `6`
+- um dicionário `info` com informações de depuração e métricas
+
+Exemplo de retorno esperado:
+
+```python
+return 3, {
+    "method": "alphabeta",
+    "depth_reached": 4,
+    "nodes_expanded": 1824,
+    "score": 124
+}
+```
+
+O servidor já possui proteção contra travamentos e timeout rígido. Mesmo assim, o agente deve tentar respeitar o tempo limite e sempre devolver uma jogada válida quando possível.
+
+## 2. Estrutura atual do projeto
+
+Os arquivos relevantes do TP1 são:
+
+- `server.py`: servidor web em Flask que expõe a interface e chama o agente.
+- `search.py`: onde a IA será implementada.
+- `templates/index.html`: interface do jogo.
+- `static/sketch.js`: lógica visual e comunicação com o servidor.
+
+No estado atual, `search.py` já contém funções utilitárias prontas para trabalhar com o tabuleiro:
+
+- `copy_board`
+- `valid_moves`
+- `make_move`
+- `winner`
+- `is_full`
+- `terminal`
+- `other`
+
+Essas funções serão reaproveitadas em todas as etapas da IA.
+
+## 3. Objetivo de implementação em etapas
+
+A implementação será feita em ordem incremental. Isso é importante porque cada etapa depende da anterior e permite testar comportamento e desempenho aos poucos.
+
+### Etapa 1 - Validação básica e jogada aleatória
+
+Objetivo: confirmar que o agente está conectado ao servidor e que consegue devolver uma coluna válida.
+
+Funções envolvidas:
+
+- `choose_move_randomly`
+- `choose_move`
+
+Comportamento esperado:
+
+- verificar movimentos válidos com `valid_moves`
+- escolher uma coluna aleatória entre as válidas
+- retornar a jogada sem tentar pensar
+
+Essa etapa serve para baseline e para garantir que a integração cliente-servidor está funcionando.
+
+### Etapa 2 - Função de avaliação heurística
+
+Objetivo: criar uma forma de estimar se um tabuleiro é bom ou ruim para um jogador, mesmo quando a partida ainda não terminou.
+
+Funções envolvidas:
+
+- `evaluate_board`
+- `score_window`
+- `count_patterns` ou funções auxiliares equivalentes
+
+Comportamento esperado:
+
+- detectar vitória, derrota e empate
+- valorizar o centro do tabuleiro
+- contar sequências de 2, 3 e 4 peças
+- penalizar ameaças do oponente
+
+Essa etapa é a base de todo o resto. Sem heurística boa, o Minimax vai tomar decisões fracas.
+
+### Etapa 3 - Minimax com profundidade limitada
+
+Objetivo: explorar jogadas futuras com alternância entre maximizar e minimizar a avaliação.
+
+Funções envolvidas:
+
+- `minimax`
+- `choose_move`
+
+Comportamento esperado:
+
+- parar em estados terminais
+- parar quando a profundidade limite é atingida
+- usar a função heurística quando não puder continuar expandindo
+- escolher a jogada que maximiza a chance de vitória do agente
+
+### Etapa 4 - Poda Alfa-Beta
+
+Objetivo: reduzir o número de nós visitados sem mudar a resposta final do Minimax.
+
+Funções envolvidas:
+
+- `alphabeta`
+- `choose_move`
+
+Comportamento esperado:
+
+- manter os mesmos valores do Minimax
+- cortar ramos que não podem melhorar a decisão final
+- registrar métricas como número de nós visitados
+
+### Etapa 5 - Iterative Deepening
+
+Objetivo: melhorar o uso do tempo disponível e manter sempre a melhor jogada encontrada até o momento.
+
+Funções envolvidas:
+
+- `iterative_deepening`
+- `alphabeta`
+- `choose_move`
+
+Comportamento esperado:
+
+- rodar profundidade 1, depois 2, depois 3 e assim por diante
+- parar quando atingir `max_depth` ou o limite de tempo
+- guardar a melhor jogada da última profundidade concluída com sucesso
+
+### Etapa 6 - Ajustes para competição
+
+Objetivo: aumentar a força da IA sem quebrar o limite de tempo.
+
+Melhorias possíveis:
+
+- ordenação de movimentos, priorizando a coluna central
+- tabela de transposição
+- heurística mais refinada
+- corte de jogadas obviamente ruins
+- reaproveitamento de resultados entre profundidades
+
+## 4. Funções que serão criadas e seu papel
+
+Esta seção detalha cada função que provavelmente será adicionada ao `search.py`.
+
+### 4.1 `choose_move(board, turn, config)`
+
+Função principal chamada pelo servidor.
+
+Responsabilidades:
+
+- ler `max_time_ms` e `max_depth`
+- gerar os movimentos possíveis
+- decidir qual estratégia usar
+- retornar uma coluna válida
+- devolver um dicionário com métricas úteis
+
+Nesta função, a implementação final deve chamar a versão evoluída da IA. Inicialmente, ela pode apenas chamar a jogada aleatória para testes. Depois, ela passará a chamar `iterative_deepening` ou `alphabeta`.
+
+### 4.2 `choose_move_randomly(board, turn, config)`
+
+Função de baseline.
+
+Responsabilidades:
+
+- listar as colunas válidas
+- escolher uma delas aleatoriamente
+- servir como referência mínima de funcionamento
+
+Uso prático:
+
+- validar se o jogo roda sem erros
+- confirmar comunicação com o servidor
+- comparar o comportamento da IA inteligente com uma estratégia simples
+
+### 4.3 `valid_moves(board)`
+
+Função utilitária já existente.
+
+Responsabilidades:
+
+- retornar todas as colunas em que ainda é possível jogar
+
+Regra usada:
+
+- uma coluna está disponível se a célula do topo dela ainda estiver vazia
+
+Essa função evita que a IA tente jogar em colunas cheias.
+
+### 4.4 `make_move(board, col, player)`
+
+Função utilitária já existente.
+
+Responsabilidades:
+
+- criar um novo tabuleiro com a jogada aplicada
+- respeitar a gravidade do Connect Four
+- retornar `None` se a jogada for inválida
+
+Ela será usada pelo Minimax e pelo Alfa-Beta para simular futuros estados do jogo sem alterar o tabuleiro original.
+
+### 4.5 `winner(board)`
+
+Função utilitária já existente.
+
+Responsabilidades:
+
+- detectar vitória horizontal
+- detectar vitória vertical
+- detectar vitória diagonal crescente e decrescente
+
+Retorno:
+
+- `0` se ninguém venceu
+- `1` se o jogador 1 venceu
+- `2` se o jogador 2 venceu
+
+### 4.6 `terminal(board)`
+
+Função utilitária já existente.
+
+Responsabilidades:
+
+- verificar se o jogo acabou
+- identificar vitória ou empate
+
+Retorno:
+
+- `(True, vencedor)` se o estado for terminal
+- `(False, 0)` caso contrário
+
+Essa função é essencial para parar a busca nos nós finais.
+
+### 4.7 `evaluate_board(board, player)`
+
+Função heurística principal que será criada.
+
+Responsabilidades:
+
+- atribuir pontuação ao tabuleiro do ponto de vista de `player`
+- devolver valor muito alto para vitória
+- devolver valor muito baixo para derrota
+- devolver valores intermediários para posições favoráveis ou perigosas
+
+Componentes esperados:
+
+- incentivo ao centro
+- sequências abertas de 2, 3 e 4
+- bloqueio de ameaças do oponente
+- penalização para posições em que o adversário tem muitas chances imediatas
+
+Sugestão de interpretação:
+
+- pontuação positiva favorece o jogador atual
+- pontuação negativa favorece o oponente
+
+### 4.8 `score_window(window, player)`
+
+Função auxiliar da heurística.
+
+Responsabilidades:
+
+- analisar uma janela de 4 casas consecutivas
+- contar peças do jogador e do oponente
+- atribuir peso conforme a configuração encontrada
+
+Exemplos de janelas úteis:
+
+- 4 peças do jogador: vitória
+- 3 peças do jogador e 1 vazia: ameaça forte
+- 2 peças do jogador e 2 vazias: potencial moderado
+- 3 peças do oponente e 1 vazia: perigo que merece punição
+
+### 4.9 `minimax(board, depth, maximizing_player, player)`
+
+Função de busca adversarial sem poda.
+
+Responsabilidades:
+
+- explorar todas as jogadas possíveis até a profundidade limite
+- alternar entre maximizar e minimizar o valor
+- usar heurística quando a profundidade terminar
+
+Essa função é a base conceitual da IA. Mesmo que a versão final use Alfa-Beta e Iterative Deepening, Minimax precisa existir para validar a lógica.
+
+### 4.10 `alphabeta(board, depth, alpha, beta, maximizing_player, player)`
+
+Versão otimizada do Minimax.
+
+Responsabilidades:
+
+- fazer tudo o que o Minimax faz
+- cortar ramos que não podem influenciar a decisão
+- manter exatamente a mesma escolha final do Minimax ideal
+
+Parâmetros clássicos:
+
+- `alpha`: melhor valor garantido para o maximizador
+- `beta`: melhor valor garantido para o minimizador
+
+### 4.11 `iterative_deepening(board, player, config)`
+
+Busca progressiva com tempo controlado.
+
+Responsabilidades:
+
+- executar busca com profundidade crescente
+- guardar a melhor jogada concluída em cada rodada
+- parar antes de estourar o tempo máximo
+
+Essa função é especialmente importante na competição, porque o tempo por jogada será rígido.
+
+### 4.12 Funções auxiliares possíveis
+
+Dependendo da organização final, talvez seja útil separar mais algumas rotinas:
+
+- `ordered_moves(board)`: retorna jogadas ordenadas por prioridade
+- `time_exceeded(start_time, max_time_ms)`: checa limite de tempo
+- `copy_board`: clona o tabuleiro para simulação
+- `get_next_open_row`: encontra a linha onde a peça cairá em uma coluna
+- `center_column_score`: calcula o bônus da coluna central
+
+## 5. Estratégia de implementação passo a passo
+
+Para manter o projeto controlado, a implementação será feita nesta ordem:
+
+### Passo 1 - Baseline funcional
+
+Primeiro, vamos garantir que `choose_move_randomly` funciona e que `choose_move` pode chamar essa lógica sem quebrar o servidor.
+
+O que será validado:
+
+- o jogo abre no navegador
+- a IA retorna uma coluna válida
+- o tabuleiro avança normalmente
+- não há erro de comunicação com o Flask
+
+### Passo 2 - Heurística
+
+Depois vamos criar a função de avaliação.
+
+O que será validado:
+
+- tabuleiros com vitória têm valor extremo
+- tabuleiros com ameaça de vitória também recebem pontuações fortes
+- posições centrais recebem bônus
+- oponente com ameaça aberta recebe penalidade
+
+### Passo 3 - Minimax simples
+
+Com a heurística pronta, implementamos Minimax com profundidade limitada.
+
+O que será validado:
+
+- a IA enxerga mais de um lance à frente
+- o código respeita `max_depth`
+- estados terminais encerram a busca corretamente
+
+### Passo 4 - Alfa-Beta
+
+Depois substituímos a busca pura por Alfa-Beta.
+
+O que será validado:
+
+- a jogada escolhida continua coerente com o Minimax
+- o número de nós expandidos diminui
+- o tempo médio por jogada melhora
+
+### Passo 5 - Iterative Deepening
+
+Por fim, conectamos o tempo máximo à busca.
+
+O que será validado:
+
+- a IA devolve resposta antes do timeout rígido
+- profundidades maiores são exploradas quando há tempo
+- a melhor jogada parcial é preservada se o tempo acabar
+
+## 6. Métricas que serão registradas
+
+Para o relatório, idealmente o agente deve coletar e devolver algumas métricas por jogada ou por partida.
+
+### Métricas principais
+
+- `nodes_expanded`: número de nós visitados durante a busca
+- `depth_reached`: profundidade máxima atingida
+- `elapsed_ms`: tempo gasto na jogada
+- `score`: avaliação final do lance escolhido
+- `best_col`: coluna escolhida ao final da busca
+
+### Métricas para o relatório
+
+- taxa de vitória
+- taxa de empate
+- tempo médio por jogada
+- média de estados visitados
+- profundidade média atingida
+
+## 7. Como o relatório deve ser pensado
+
+O relatório final deve explicar a evolução do agente, não apenas mostrar resultados.
+
+### Estrutura sugerida
+
+1. Introdução e objetivo do TP1.
+2. Metodologia de construção da IA.
+3. Experimentos e resultados.
+4. Discussão crítica.
+5. Conclusão.
+
+### Linha narrativa recomendada
+
+O texto deve mostrar esta progressão:
+
+- primeiro, um agente aleatório para garantir o ambiente
+- depois, uma heurística que reconhece tabuleiros promissores
+- em seguida, Minimax para raciocínio estratégico
+- depois, Alfa-Beta para eficiência
+- por fim, Iterative Deepening para lidar com o limite de tempo
+
+## 8. Plano prático de execução nesta conversa
+
+Vamos trabalhar em blocos pequenos.
+
+### Ordem de implementação que vou seguir com você
+
+1. Definir e testar a função de avaliação heurística.
+2. Implementar Minimax com profundidade limitada.
+3. Acrescentar Alfa-Beta.
+4. Acrescentar Iterative Deepening.
+5. Ajustar métricas e formato do retorno.
+6. Rodar testes e comparar comportamento.
+
+### Regra de trabalho
+
+Em cada etapa:
+
+- eu explico o que a função faz
+- eu implemento somente aquela parte
+- eu valido se o código continua funcionando
+- só então avançamos para a próxima
+
+## 9. Estado atual do projeto
+
+Neste momento:
+
+- o servidor já está pronto para chamar o agente
+- `search.py` ainda está no estágio inicial
+- as funções utilitárias de tabuleiro já existem
+- a próxima peça lógica a ser construída é a heurística
+
+Se você quiser, o próximo passo pode ser começar pela função de avaliação, porque ela será usada por Minimax, Alfa-Beta e Iterative Deepening.
