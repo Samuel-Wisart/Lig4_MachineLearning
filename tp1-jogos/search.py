@@ -264,44 +264,206 @@ def minimax(
 
     return int(best_score), best_move, True
 
+def alphabeta(
+    board: List[List[int]],
+    depth: int,
+    alpha: float,
+    beta: float,
+    maximizing: bool,
+    root_player: int,
+    current_player: int,
+    deadline: float,
+    stats: Dict[str, int],
+) -> Tuple[int, Optional[int], bool]:
+    """
+    Retorna (score, best_move, completed) usando poda Alfa-Beta.
+    completed=False indica que o tempo foi estourado durante a busca.
+    """
+    if time.time() >= deadline:
+        return 0, None, False
+
+    stats["nodes"] = stats.get("nodes", 0) + 1
+
+    is_terminal, _ = terminal(board)
+    if depth == 0 or is_terminal:
+        return evaluate_board(board, root_player), None, True
+
+    legal = ordered_moves(board)
+    if not legal:
+        return evaluate_board(board, root_player), None, True
+
+    if maximizing:
+        best_score = -math.inf
+        best_move = legal[0]
+        for col in legal:
+            child = make_move(board, col, current_player)
+            if child is None:
+                continue
+
+            child_score, _, completed = alphabeta(
+                child,
+                depth - 1,
+                alpha,
+                beta,
+                False,
+                root_player,
+                other(current_player),
+                deadline,
+                stats,
+            )
+            if not completed:
+                return 0, None, False
+
+            if child_score > best_score:
+                best_score = child_score
+                best_move = col
+
+            alpha = max(alpha, best_score)
+            if beta <= alpha:
+                stats["prunes"] = stats.get("prunes", 0) + 1
+                break
+
+        return int(best_score), best_move, True
+
+    best_score = math.inf
+    best_move = legal[0]
+    for col in legal:
+        child = make_move(board, col, current_player)
+        if child is None:
+            continue
+
+        child_score, _, completed = alphabeta(
+            child,
+            depth - 1,
+            alpha,
+            beta,
+            True,
+            root_player,
+            other(current_player),
+            deadline,
+            stats,
+        )
+        if not completed:
+            return 0, None, False
+
+        if child_score < best_score:
+            best_score = child_score
+            best_move = col
+
+        beta = min(beta, best_score)
+        if beta <= alpha:
+            stats["prunes"] = stats.get("prunes", 0) + 1
+            break
+
+    return int(best_score), best_move, True
+
 # -----------------------------------------------------------------------------
 # ÚNICO PONTO A SER IMPLEMENTADO PELOS ALUNOS
 # -----------------------------------------------------------------------------
-def choose_move(board: List[List[int]], turn: int, config: Dict) -> int:
+def choose_move_search(board: List[List[int]], turn: int, config: Dict, method: str) -> int:
     """
-    Decide a coluna (0..6) para jogar agora.
+    Decide a coluna (0..6) para jogar agora com o método escolhido.
 
-    Parâmetros:
-      - board: matriz 6x7 com valores {0,1,2}
-      - turn: 1 ou 2
-      - config: {"max_time_ms": int, "max_depth": int}
-
-        Retorna:
-            - col: int (0..6)
+    method:
+      - "minimax"
+    - "alphabeta"
+    - "iterative_deepening"
     """
     max_time_ms = int(config.get("max_time_ms"))
     max_depth = int(config.get("max_depth"))
     turn = int(turn)
 
-    print(f"AI choose_move called with max_time_ms={max_time_ms}, max_depth={max_depth}, player={turn}")
-    
-    legal = valid_moves(board)
+    print(
+        f"AI choose_move called with method={method}, max_time_ms={max_time_ms}, "
+        f"max_depth={max_depth}, player={turn}"
+    )
 
-    move = 0
+    legal = valid_moves(board)
     if not legal:
         # Sem jogadas: devolve 0 por convenção (servidor lida com isso)
-        return move
+        return 0
 
-    # Bloco 2: Minimax com profundidade limitada + heurística
-    if max_time_ms and max_time_ms > 0:
+    if max_time_ms > 0:
         deadline = time.time() + (max_time_ms / 1000.0) * 0.95
     else:
         deadline = time.time() + 3600.0
 
-    stats: Dict[str, int] = {"nodes": 0}
-    score, best_move, completed = minimax(
+    search_depth = max(1, max_depth)
+
+    if method == "minimax":
+        stats: Dict[str, int] = {"nodes": 0}
+        score, best_move, completed = minimax(
+            board=board,
+            depth=search_depth,
+            maximizing=True,
+            root_player=turn,
+            current_player=turn,
+            deadline=deadline,
+            stats=stats,
+        )
+
+        if completed and best_move is not None and best_move in legal:
+            move = best_move
+        else:
+            move = random.choice(legal)
+
+        print(
+            "Minimax selected "
+            f"col={move} score={score} nodes={stats['nodes']} completed={completed}"
+        )
+        return move
+
+    if method == "iterative_deepening":
+        best_move = None
+        best_score = 0
+        best_depth = 0
+        nodes_total = 0
+        prunes_total = 0
+
+        for depth in range(1, search_depth + 1):
+            if time.time() >= deadline:
+                break
+
+            stats = {"nodes": 0, "prunes": 0}
+            score, move_candidate, completed = alphabeta(
+                board=board,
+                depth=depth,
+                alpha=-math.inf,
+                beta=math.inf,
+                maximizing=True,
+                root_player=turn,
+                current_player=turn,
+                deadline=deadline,
+                stats=stats,
+            )
+
+            nodes_total += stats["nodes"]
+            prunes_total += stats["prunes"]
+
+            if completed and move_candidate is not None and move_candidate in legal:
+                best_move = move_candidate
+                best_score = score
+                best_depth = depth
+                continue
+
+            break
+
+        if best_move is None:
+            best_move = random.choice(legal)
+
+        print(
+            "IterativeDeepening selected "
+            f"col={best_move} score={best_score} depth_reached={best_depth} "
+            f"nodes={nodes_total} prunes={prunes_total}"
+        )
+        return best_move
+
+    stats = {"nodes": 0, "prunes": 0}
+    score, best_move, completed = alphabeta(
         board=board,
-        depth=max(1, max_depth),
+        depth=search_depth,
+        alpha=-math.inf,
+        beta=math.inf,
         maximizing=True,
         root_player=turn,
         current_player=turn,
@@ -312,12 +474,30 @@ def choose_move(board: List[List[int]], turn: int, config: Dict) -> int:
     if completed and best_move is not None and best_move in legal:
         move = best_move
     else:
-        # Fallback seguro caso timeout dentro da recursão
         move = random.choice(legal)
 
-    print(f"Minimax selected col={move} score={score} nodes={stats['nodes']} completed={completed}")
+    print(
+        "AlphaBeta selected "
+        f"col={move} score={score} nodes={stats['nodes']} prunes={stats['prunes']} completed={completed}"
+    )
 
     return move
+
+def choose_move(board: List[List[int]], turn: int, config: Dict) -> int:
+    """Modo padrão do aluno: Iterative Deepening com Alfa-Beta."""
+    return choose_move_search(board, turn, config, method="iterative_deepening")
+
+def choose_move_iterative_deepening(board: List[List[int]], turn: int, config: Dict) -> int:
+    """IA com Iterative Deepening sobre Alfa-Beta, para uso principal e competição."""
+    return choose_move_search(board, turn, config, method="iterative_deepening")
+
+def choose_move_minimax(board: List[List[int]], turn: int, config: Dict) -> int:
+    """IA com busca Minimax sem poda, para comparação."""
+    return choose_move_search(board, turn, config, method="minimax")
+
+def choose_move_alphabeta(board: List[List[int]], turn: int, config: Dict) -> int:
+    """IA com busca Alfa-Beta, para comparação."""
+    return choose_move_search(board, turn, config, method="alphabeta")
 
 def choose_move_randomly(board: List[List[int]], turn: int, config: Dict) -> int:
     max_time_ms = int(config.get("max_time_ms"))

@@ -471,8 +471,200 @@ Em cada etapa:
 Neste momento:
 
 - o servidor já está pronto para chamar o agente
-- `search.py` ainda está no estágio inicial
 - as funções utilitárias de tabuleiro já existem
-- a próxima peça lógica a ser construída é a heurística
+- a heurística, Minimax, Alfa-Beta e Iterative Deepening já estão implementados
+- a IA padrão do aluno é `AI_Student`, que usa Iterative Deepening sobre Alfa-Beta
+- existem modos específicos para comparação: `AI_Minimax`, `AI_AlphaBeta`, `AI_Random` e `AI_Dummy`
 
-Se você quiser, o próximo passo pode ser começar pela função de avaliação, porque ela será usada por Minimax, Alfa-Beta e Iterative Deepening.
+## 10. Versões do agente e comparação experimental
+
+O projeto foi organizado para que a comparação entre estratégias fique clara tanto na interface quanto no relatório.
+
+### Agentes disponíveis
+
+- `AI_Random`: escolhe uma jogada válida aleatória
+- `AI_Dummy`: escolhe uma jogada válida simples, usada como fallback
+- `AI_Minimax`: usa busca Minimax sem poda
+- `AI_AlphaBeta`: usa Minimax com poda Alfa-Beta
+- `AI_Student`: usa Iterative Deepening com Alfa-Beta, sendo a versão principal do trabalho
+
+### O que comparar no relatório
+
+O relatório pode destacar a evolução em três níveis:
+
+- Baseline: aleatório e dummy
+- Busca exata limitada: Minimax e Alfa-Beta
+- Busca adaptada ao tempo: Iterative Deepening
+
+### Interpretação esperada
+
+- Minimax deve ser mais lento e visitar mais nós
+- Alfa-Beta deve reduzir os nós visitados sem mudar a decisão ideal
+- Iterative Deepening deve respeitar melhor o tempo e entregar a melhor jogada concluída até o momento
+
+## 11. Decisões de projeto já adotadas
+
+Essas decisões são úteis para justificar escolhas metodológicas no texto do relatório.
+
+### Heurística
+
+- valoriza o centro do tabuleiro
+- avalia janelas de 4 casas em horizontal, vertical e diagonal
+- prioriza ameaças imediatas e também ameaças futuras com peso reduzido
+- penaliza sequências perigosas do oponente
+
+### Busca
+
+- Minimax é usado como referência conceitual
+- Alfa-Beta é a versão otimizada da busca principal
+- Iterative Deepening é usado para lidar com o limite de tempo rígido
+- a ordenação de jogadas privilegia a coluna central, o que costuma melhorar a poda
+
+### Controle de tempo
+
+- o agente não deve depender de um timeout perfeito para terminar bem
+- o servidor impõe um hard timeout e também um fallback
+- quando uma jogada inválida ou um timeout extremo ocorre, o servidor escolhe uma jogada válida aleatória
+
+## 12. Estrutura recomendada para o relatório
+
+Esta seção foi pensada para facilitar a transformação do README em texto de LaTeX.
+
+### 12.1 Introdução
+
+Explique o problema do Connect Four como um jogo de informação perfeita, determinístico e de soma zero. Destaque que o objetivo é implementar um agente de busca adversarial capaz de competir sob restrição de tempo.
+
+### 12.2 Objetivo
+
+Descreva que o trabalho busca comparar estratégias de busca, medir custo computacional e avaliar o impacto da heurística no desempenho do agente.
+
+### 12.3 Metodologia
+
+Explique a evolução do agente em ordem:
+
+1. baseline aleatório
+2. heurística de avaliação
+3. Minimax com profundidade limitada
+4. Alfa-Beta
+5. Iterative Deepening com limite de tempo
+
+### 12.4 Implementação
+
+Detalhe as funções centrais:
+
+- `choose_move`
+- `evaluate_board`
+- `score_window`
+- `minimax`
+- `alphabeta`
+- `choose_move_iterative_deepening`
+
+Explique também o papel do servidor em `server.py`, que isola a execução do agente em outro processo e impõe timeout rígido.
+
+### 12.5 Experimentos
+
+Apresente as comparações propostas:
+
+- Minimax vs aleatório nas profundidades 2, 3, 4 e 5
+- Alfa-Beta vs Minimax nas profundidades 2, 3, 4 e 5
+- Iterative Deepening vs Alfa-Beta com limites de tempo de 1s e 2s
+- partidas contra humano para análise qualitativa
+
+### 12.6 Discussão
+
+Comente os trade-offs entre profundidade, tempo e qualidade da decisão. Explique que aprofundar a busca nem sempre é útil se o limite de tempo impede completar a rodada.
+
+### 12.7 Conclusão
+
+Resuma qual técnica se mostrou mais equilibrada para o ambiente com tempo rígido e aponte possíveis melhorias futuras.
+
+## 13. Experimentos sugeridos e métricas
+
+Use esta seção como base para tabelas e figuras no relatório.
+
+### 13.1 Minimax vs Aleatório
+
+Para cada profundidade:
+
+- taxa de vitória
+- taxa de empate
+- tempo médio por jogada
+- média de nós visitados
+
+Espera-se que a profundidade maior melhore a qualidade, mas aumente significativamente o custo.
+
+### 13.2 Alfa-Beta vs Minimax
+
+Para cada profundidade:
+
+- taxa de vitória
+- tempo médio por jogada
+- média de nós visitados
+
+Espera-se manter a qualidade e reduzir o número de nós visitados.
+
+### 13.3 Iterative Deepening vs Alfa-Beta
+
+Para cada limite de tempo:
+
+- taxa de vitória
+- tempo médio por jogada
+- profundidade média atingida
+- média de nós visitados
+
+Espera-se que o agente entregue uma resposta melhor sob limitação rígida de tempo.
+
+### 13.4 Partidas contra humano
+
+Registre observações qualitativas como:
+
+- força de bloqueio
+- capacidade de criar ameaças
+- preferência por centro
+- erros recorrentes em táticas mais longas
+
+### 13.5 Como registrar resultados
+
+Para cada confronto, anote:
+
+- método usado por cada lado
+- profundidade ou tempo configurado
+- número de partidas
+- resultados finais
+- observações relevantes sobre o comportamento do agente
+
+## 14. Observações importantes sobre a execução
+
+Esses pontos ajudam a interpretar corretamente o comportamento observado durante os testes.
+
+### Timeout e fallback
+
+- o agente tenta terminar a busca dentro do tempo configurado
+- se o processo ultrapassar o limite rígido, o servidor interrompe a execução
+- em caso de timeout ou falha, o servidor escolhe uma jogada válida aleatória como proteção
+
+### Por que Iterative Deepening é importante
+
+- ele garante que exista sempre uma melhor jogada conhecida até a última profundidade concluída
+- isso é mais seguro do que depender apenas de uma busca profunda única
+- é a técnica mais adequada para competição com tempo fixo por jogada
+
+### Como interpretar a comparação entre profundidades
+
+- profundidade maior normalmente melhora a qualidade da decisão
+- porém, se o tempo não permitir completar a busca, a vantagem prática pode desaparecer
+- por isso o relatório deve discutir custo e benefício, não apenas vitória ou derrota
+
+## 15. Texto-base para introduzir o relatório
+
+O trecho abaixo pode servir como rascunho para a introdução do texto final:
+
+"Neste trabalho foi desenvolvido um agente de IA para o jogo Ligue-4 utilizando busca adversarial. A implementação foi construída de forma incremental, partindo de uma baseline aleatória, seguida por uma função heurística de avaliação, pela busca Minimax com profundidade limitada, pela poda Alfa-Beta e, por fim, por Iterative Deepening para adequação ao limite de tempo por jogada. A proposta permitiu comparar qualidade de decisão, número de nós expandidos e tempo médio por jogada em diferentes configurações, evidenciando o impacto das otimizações de busca em um ambiente de jogo competitivo."
+
+## 16. Texto-base para a metodologia
+
+Outro rascunho útil para o relatório:
+
+"A heurística foi projetada para refletir características estratégicas relevantes do Connect Four, como valorização da coluna central, identificação de janelas com sequências abertas e penalização de ameaças do oponente. Sobre essa avaliação, foi implementado Minimax com profundidade limitada, posteriormente otimizado com poda Alfa-Beta. Para respeitar o limite rígido de tempo imposto pelo servidor, a versão final do agente utiliza Iterative Deepening, que explora sucessivamente profundidades crescentes e mantém a melhor jogada completamente avaliada antes do esgotamento do tempo."
+
+Se você quiser, eu posso transformar essas seções em um esqueleto de LaTeX já com títulos, subtítulos e espaços para tabelas.
