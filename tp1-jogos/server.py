@@ -1,6 +1,5 @@
 # server.py
 import time
-import random
 from multiprocessing import Process, Queue, get_context
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
@@ -12,19 +11,17 @@ CORS(app)
 ROWS, COLS = 6, 7
 
 AI_PLAYERS = {
-    "AI_Student" : search.choose_move_iterative_deepening,
-    "AI_Minimax" : search.choose_move_minimax,
-    "AI_AlphaBeta" : search.choose_move_alphabeta,
+    "AI_Student" : search.choose_move,
     "AI_Random" : search.choose_move_randomly,
     "AI_Dummy": search.choose_move_infinity
 }
 
 def fallback_move(board):
-    """Escolhe uma coluna válida aleatória como fallback simples."""
-    legal = [c for c in range(COLS) if board[0][c] == 0]
-    if not legal:
-        return 0  # Nenhuma jogada possível (tabuleiro cheio)
-    return random.choice(legal)
+    """Escolhe a primeira coluna válida (fallback simples)."""
+    for c in range(COLS):
+        if board[0][c] == 0:
+            return c
+    return 0  # Nenhuma jogada possível (tabuleiro cheio)
 
 def _agent_worker(board, player, turn, config, q):
     """Roda em OUTRO processo para isolar travamentos/loops infinitos."""
@@ -63,10 +60,6 @@ def run_agent_with_timeout(board, player, turn, config, timeout_s=5.0):
     status, payload = q.get()
     if status == "ok":
         col = payload
-        if col not in range(COLS) or board[0][col] != 0:
-            col = fallback_move(board)
-            info = {"invalid_move": True, "method": "fallback"}
-            return col, info
         info = {"method": "AI"}
         return col, info
     else:
