@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import List, Tuple, Optional, Dict
 import time
 import math
@@ -82,8 +83,93 @@ OPP_TWO_PENALTY = 12
 FUTURE_THREE_FACTOR = 0.35
 FUTURE_TWO_FACTOR = 0.5
 
-def score_window(window: List[int], player: int, playable_empties: Optional[int] = None) -> int:
+
+@dataclass(frozen=True)
+class HeuristicWeights:
+    win_score: int = WIN_SCORE
+    three_in_a_row_score: int = THREE_IN_A_ROW_SCORE
+    two_in_a_row_score: int = TWO_IN_A_ROW_SCORE
+    center_column_score: int = CENTER_COLUMN_SCORE
+    opp_three_penalty: int = OPP_THREE_PENALTY
+    opp_two_penalty: int = OPP_TWO_PENALTY
+    future_three_factor: float = FUTURE_THREE_FACTOR
+    future_two_factor: float = FUTURE_TWO_FACTOR
+
+
+def heuristic_weights_from_config(config: Optional[Dict] = None) -> HeuristicWeights:
+    if config is None:
+        config = {}
+
+    explicit_override_keys = {
+        "WIN_SCORE",
+        "THREE_IN_A_ROW_SCORE",
+        "TWO_IN_A_ROW_SCORE",
+        "CENTER_COLUMN_SCORE",
+        "OPP_THREE_PENALTY",
+        "OPP_TWO_PENALTY",
+        "FUTURE_THREE_FACTOR",
+        "FUTURE_TWO_FACTOR",
+    }
+
+    if any(key in config for key in explicit_override_keys):
+        return HeuristicWeights(
+            win_score=int(config.get("WIN_SCORE", WIN_SCORE)),
+            three_in_a_row_score=int(config.get("THREE_IN_A_ROW_SCORE", THREE_IN_A_ROW_SCORE)),
+            two_in_a_row_score=int(config.get("TWO_IN_A_ROW_SCORE", TWO_IN_A_ROW_SCORE)),
+            center_column_score=int(config.get("CENTER_COLUMN_SCORE", CENTER_COLUMN_SCORE)),
+            opp_three_penalty=int(config.get("OPP_THREE_PENALTY", OPP_THREE_PENALTY)),
+            opp_two_penalty=int(config.get("OPP_TWO_PENALTY", OPP_TWO_PENALTY)),
+            future_three_factor=float(config.get("FUTURE_THREE_FACTOR", FUTURE_THREE_FACTOR)),
+            future_two_factor=float(config.get("FUTURE_TWO_FACTOR", FUTURE_TWO_FACTOR)),
+        )
+
+    max_time_ms = int(config.get("max_time_ms", 0) or 0)
+    if max_time_ms <= 1000 and max_time_ms > 0:
+        return HeuristicWeights(
+            win_score=100000,
+            three_in_a_row_score=108,
+            two_in_a_row_score=11,
+            center_column_score=5,
+            opp_three_penalty=110,
+            opp_two_penalty=11,
+            future_three_factor=0.4025,
+            future_two_factor=0.575,
+        )
+
+    if max_time_ms >= 2000:
+        return HeuristicWeights(
+            win_score=100000,
+            three_in_a_row_score=92,
+            two_in_a_row_score=9,
+            center_column_score=5,
+            opp_three_penalty=130,
+            opp_two_penalty=13,
+            future_three_factor=0.4025,
+            future_two_factor=0.575,
+        )
+
+    return HeuristicWeights(
+        win_score=WIN_SCORE,
+        three_in_a_row_score=THREE_IN_A_ROW_SCORE,
+        two_in_a_row_score=TWO_IN_A_ROW_SCORE,
+        center_column_score=CENTER_COLUMN_SCORE,
+        opp_three_penalty=OPP_THREE_PENALTY,
+        opp_two_penalty=OPP_TWO_PENALTY,
+        future_three_factor=FUTURE_THREE_FACTOR,
+        future_two_factor=FUTURE_TWO_FACTOR,
+    )
+
+def score_window(
+    window: List[int],
+    player: int,
+    playable_empties: Optional[int] = None,
+    weights: Optional[HeuristicWeights] = None,
+    use_future: bool = True,
+) -> int:
     """Avalia uma janela de 4 células do ponto de vista de `player`."""
+    if weights is None:
+        weights = HeuristicWeights()
+
     opponent = other(player)
     player_count = window.count(player)
     opponent_count = window.count(opponent)
@@ -97,27 +183,27 @@ def score_window(window: List[int], player: int, playable_empties: Optional[int]
         playable_empties = empty_count
 
     if player_count == 4:
-        return WIN_SCORE
+        return weights.win_score
     if opponent_count == 4:
-        return -WIN_SCORE
+        return -weights.win_score
 
     score = 0
 
     immediate = playable_empties >= 1
-    future_three = int(THREE_IN_A_ROW_SCORE * FUTURE_THREE_FACTOR)
-    future_two = int(TWO_IN_A_ROW_SCORE * FUTURE_TWO_FACTOR)
-    future_opp_three = int(OPP_THREE_PENALTY * FUTURE_THREE_FACTOR)
-    future_opp_two = int(OPP_TWO_PENALTY * FUTURE_TWO_FACTOR)
+    future_three = int(weights.three_in_a_row_score * weights.future_three_factor) if use_future else 0
+    future_two = int(weights.two_in_a_row_score * weights.future_two_factor) if use_future else 0
+    future_opp_three = int(weights.opp_three_penalty * weights.future_three_factor) if use_future else 0
+    future_opp_two = int(weights.opp_two_penalty * weights.future_two_factor) if use_future else 0
 
     if player_count == 3 and empty_count == 1:
-        score += THREE_IN_A_ROW_SCORE if immediate else future_three
+        score += weights.three_in_a_row_score if immediate else future_three
     elif player_count == 2 and empty_count == 2:
-        score += TWO_IN_A_ROW_SCORE if immediate else future_two
+        score += weights.two_in_a_row_score if immediate else future_two
 
     if opponent_count == 3 and empty_count == 1:
-        score -= OPP_THREE_PENALTY if immediate else future_opp_three
+        score -= weights.opp_three_penalty if immediate else future_opp_three
     elif opponent_count == 2 and empty_count == 2:
-        score -= OPP_TWO_PENALTY if immediate else future_opp_two
+        score -= weights.opp_two_penalty if immediate else future_opp_two
 
     return score
 
@@ -125,23 +211,37 @@ def is_playable_cell(board: List[List[int]], row: int, col: int) -> bool:
     """Retorna se uma célula vazia pode ser jogada agora (respeitando gravidade)."""
     return row == ROWS - 1 or board[row + 1][col] != EMPTY
 
-def score_window_with_coords(board: List[List[int]], coords: List[Tuple[int, int]], player: int) -> int:
+def score_window_with_coords(
+    board: List[List[int]],
+    coords: List[Tuple[int, int]],
+    player: int,
+    weights: Optional[HeuristicWeights] = None,
+    use_future: bool = True,
+) -> int:
     """Extrai uma janela por coordenadas e passa para score_window com noção de jogabilidade."""
     window = [board[r][c] for r, c in coords]
     playable_empties = 0
     for row, col in coords:
         if board[row][col] == EMPTY and is_playable_cell(board, row, col):
             playable_empties += 1
-    return score_window(window, player, playable_empties)
+    return score_window(window, player, playable_empties, weights=weights, use_future=use_future)
 
-def evaluate_board(board: List[List[int]], player: int) -> int:
+def evaluate_board(
+    board: List[List[int]],
+    player: int,
+    weights: Optional[HeuristicWeights] = None,
+    use_future: bool = True,
+) -> int:
     """Calcula a qualidade do tabuleiro para `player`. Valores altos favorecem `player`."""
+    if weights is None:
+        weights = HeuristicWeights()
+
     is_terminal, winner_player = terminal(board)
     if is_terminal:
         if winner_player == player:
-            return WIN_SCORE
+            return weights.win_score
         if winner_player == other(player):
-            return -WIN_SCORE
+            return -weights.win_score
         return 0
 
     score = 0
@@ -152,31 +252,31 @@ def evaluate_board(board: List[List[int]], player: int) -> int:
     for row in range(ROWS):
         if board[row][center_column] == player:
             center_count += 1
-    score += center_count * CENTER_COLUMN_SCORE
+    score += center_count * weights.center_column_score
 
     # Janelas horizontais
     for row in range(ROWS):
         for col in range(COLS - 3):
             coords = [(row, col + offset) for offset in range(4)]
-            score += score_window_with_coords(board, coords, player)
+            score += score_window_with_coords(board, coords, player, weights=weights, use_future=use_future)
 
     # Janelas verticais
     for col in range(COLS):
         for row in range(ROWS - 3):
             coords = [(row + offset, col) for offset in range(4)]
-            score += score_window_with_coords(board, coords, player)
+            score += score_window_with_coords(board, coords, player, weights=weights, use_future=use_future)
 
     # Janelas diagonais descendentes
     for row in range(ROWS - 3):
         for col in range(COLS - 3):
             coords = [(row + offset, col + offset) for offset in range(4)]
-            score += score_window_with_coords(board, coords, player)
+            score += score_window_with_coords(board, coords, player, weights=weights, use_future=use_future)
 
     # Janelas diagonais ascendentes
     for row in range(3, ROWS):
         for col in range(COLS - 3):
             coords = [(row - offset, col + offset) for offset in range(4)]
-            score += score_window_with_coords(board, coords, player)
+            score += score_window_with_coords(board, coords, player, weights=weights, use_future=use_future)
 
     return score
 
@@ -194,6 +294,8 @@ def minimax(
     current_player: int,
     deadline: float,
     stats: Dict[str, int],
+    weights: HeuristicWeights,
+    use_future: bool,
 ) -> Tuple[int, Optional[int], bool]:
     """
     Retorna (score, best_move, completed).
@@ -206,11 +308,11 @@ def minimax(
 
     is_terminal, _ = terminal(board)
     if depth == 0 or is_terminal:
-        return evaluate_board(board, root_player), None, True
+        return evaluate_board(board, root_player, weights=weights, use_future=use_future), None, True
 
     legal = ordered_moves(board)
     if not legal:
-        return evaluate_board(board, root_player), None, True
+        return evaluate_board(board, root_player, weights=weights, use_future=use_future), None, True
 
     if maximizing:
         best_score = -math.inf
@@ -228,6 +330,8 @@ def minimax(
                 other(current_player),
                 deadline,
                 stats,
+                weights,
+                use_future,
             )
             if not completed:
                 return 0, None, False
@@ -254,6 +358,8 @@ def minimax(
             other(current_player),
             deadline,
             stats,
+            weights,
+            use_future,
         )
         if not completed:
             return 0, None, False
@@ -274,6 +380,8 @@ def alphabeta(
     current_player: int,
     deadline: float,
     stats: Dict[str, int],
+    weights: HeuristicWeights,
+    use_future: bool,
 ) -> Tuple[int, Optional[int], bool]:
     """
     Retorna (score, best_move, completed) usando poda Alfa-Beta.
@@ -286,11 +394,11 @@ def alphabeta(
 
     is_terminal, _ = terminal(board)
     if depth == 0 or is_terminal:
-        return evaluate_board(board, root_player), None, True
+        return evaluate_board(board, root_player, weights=weights, use_future=use_future), None, True
 
     legal = ordered_moves(board)
     if not legal:
-        return evaluate_board(board, root_player), None, True
+        return evaluate_board(board, root_player, weights=weights, use_future=use_future), None, True
 
     if maximizing:
         best_score = -math.inf
@@ -310,6 +418,8 @@ def alphabeta(
                 other(current_player),
                 deadline,
                 stats,
+                weights,
+                use_future,
             )
             if not completed:
                 return 0, None, False
@@ -342,6 +452,8 @@ def alphabeta(
             other(current_player),
             deadline,
             stats,
+            weights,
+            use_future,
         )
         if not completed:
             return 0, None, False
@@ -372,10 +484,12 @@ def choose_move_search(board: List[List[int]], turn: int, config: Dict, method: 
     max_time_ms = int(config.get("max_time_ms"))
     max_depth = int(config.get("max_depth"))
     turn = int(turn)
+    weights = heuristic_weights_from_config(config)
+    use_future = bool(config.get("use_future", True))
 
     print(
         f"AI choose_move called with method={method}, max_time_ms={max_time_ms}, "
-        f"max_depth={max_depth}, player={turn}"
+        f"max_depth={max_depth}, player={turn}, use_future={use_future}"
     )
 
     legal = valid_moves(board)
@@ -400,6 +514,8 @@ def choose_move_search(board: List[List[int]], turn: int, config: Dict, method: 
             current_player=turn,
             deadline=deadline,
             stats=stats,
+            weights=weights,
+            use_future=use_future,
         )
 
         if completed and best_move is not None and best_move in legal:
@@ -435,6 +551,8 @@ def choose_move_search(board: List[List[int]], turn: int, config: Dict, method: 
                 current_player=turn,
                 deadline=deadline,
                 stats=stats,
+                weights=weights,
+                use_future=use_future,
             )
 
             nodes_total += stats["nodes"]
@@ -469,6 +587,8 @@ def choose_move_search(board: List[List[int]], turn: int, config: Dict, method: 
         current_player=turn,
         deadline=deadline,
         stats=stats,
+        weights=weights,
+        use_future=use_future,
     )
 
     if completed and best_move is not None and best_move in legal:
