@@ -1,0 +1,101 @@
+================================================================================
+RELATÓRIO DE EXPERIMENTOS - CONNECT FOUR
+================================================================================
+
+1. EXPERIMENTO: MINIMAX VS ALEATÓRIO
+--------------------------------------------------------------------------------
+
+Profundidade 2:
+  Minimax vs Aleatório (5 jogos):
+    - Minimax: 5 vitórias (100.0%)
+    - Aleatório: 0 vitórias (0.0%)
+    - Empates: 0
+    - Tempo médio (Minimax): 6.00 ms
+    - Tempo médio (Aleatório): 0.00 ms
+    - Nós visitados médios (Minimax): 55
+
+Profundidade 3:
+  Minimax vs Aleatório (5 jogos):
+    - Minimax: 5 vitórias (100.0%)
+    - Aleatório: 0 vitórias (0.0%)
+    - Empates: 0
+    - Tempo médio (Minimax): 37.29 ms
+    - Tempo médio (Aleatório): 0.00 ms
+    - Nós visitados médios (Minimax): 351
+
+Profundidade 4:
+  Minimax vs Aleatório (3 jogos):
+    - Minimax: 3 vitórias (100.0%)
+    - Aleatório: 0 vitórias (0.0%)
+    - Empates: 0
+    - Tempo médio (Minimax): 284.95 ms
+    - Tempo médio (Aleatório): 0.00 ms
+    - Nós visitados médios (Minimax): 2421
+
+
+2. EXPERIMENTO: ALFA-BETA VS MINIMAX
+--------------------------------------------------------------------------------
+
+Profundidade 2:
+  Alfa-Beta vs Minimax (5 jogos):
+    - Alfa-Beta: 0 vitórias (0.0%)
+    - Minimax: 5 vitórias (100.0%)
+    - Empates: 0
+    - Tempo médio (Alfa-Beta): 1.59 ms
+    - Tempo médio (Minimax): 3.74 ms
+    - Nós visitados médios (Alfa-Beta): 23
+    - Nós visitados médios (Minimax): 39
+    - Redução de nós (Alfa-Beta): 40.7%
+
+Profundidade 3:
+  Alfa-Beta vs Minimax (5 jogos):
+    - Alfa-Beta: 0 vitórias (0.0%)
+    - Minimax: 5 vitórias (100.0%)
+    - Empates: 0
+    - Tempo médio (Alfa-Beta): 8.54 ms
+    - Tempo médio (Minimax): 21.90 ms
+    - Nós visitados médios (Alfa-Beta): 91
+    - Nós visitados médios (Minimax): 201
+    - Redução de nós (Alfa-Beta): 54.8%
+
+Profundidade 4:
+  Alfa-Beta vs Minimax (3 jogos):
+    - Alfa-Beta: 3 vitórias (100.0%)
+    - Minimax: 0 vitórias (0.0%)
+    - Empates: 0
+    - Tempo médio (Alfa-Beta): 36.91 ms
+    - Tempo médio (Minimax): 264.77 ms
+    - Nós visitados médios (Alfa-Beta): 390
+    - Nós visitados médios (Minimax): 2320
+    - Redução de nós (Alfa-Beta): 83.2%
+
+
+3. EXPERIMENTO: ITERATIVE DEEPENING VS ALFA-BETA
+--------------------------------------------------------------------------------
+
+Limite de tempo 1000 ms:
+  Iterative Deepening vs Alfa-Beta (2 jogos):
+    - Iterative Deepening: 2 vitórias (100.0%)
+    - Alfa-Beta: 0 vitórias (0.0%)
+    - Empates: 0
+    - Tempo médio (Iterative): 800.00 ms
+    - Tempo médio (Alfa-Beta): 800.00 ms
+    - Profundidade média atingida (Iterative): 5.6
+    - Nós visitados médios (Iterative): 7457
+    - Nós visitados médios (Alfa-Beta): 21335
+
+Limite de tempo 2000 ms:
+  Iterative Deepening vs Alfa-Beta (2 jogos):
+    - Iterative Deepening: 2 vitórias (100.0%)
+    - Alfa-Beta: 0 vitórias (0.0%)
+    - Empates: 0
+    - Tempo médio (Iterative): 1600.00 ms
+    - Tempo médio (Alfa-Beta): 1600.00 ms
+    - Profundidade média atingida (Iterative): 6.8
+    - Nós visitados médios (Iterative): 16797
+    - Nós visitados médios (Alfa-Beta): 31205
+
+
+================================================================================
+FIM DO RELATÓRIO
+================================================================================
